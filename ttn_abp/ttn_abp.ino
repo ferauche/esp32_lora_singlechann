@@ -17,21 +17,15 @@
    no arquivo au915.c
  */
 
-
 /***************************************************************************
  *  Go to your TTN console register a device then the copy fields
- *  and replace the CHANGE_ME strings below
  ****************************************************************************/
-const char* devAddr = "0"; // Change to TTN Device Address
-const char* nwkSKey = "0"; // Change to TTN Network Session Key
-const char* appSKey = "0"; // Change to TTN Application Session Key
+// LoRaWAN NwkSKey, network session key msb format
+static const PROGMEM u1_t NWKSKEY[16] = { 0xEB, 0x74, 0x9D, 0x8F, 0xFD, 0x21, 0x31, 0x52, 0x9E, 0xE2, 0x6C, 0x79, 0xD7, 0xCD, 0xFF, 0x1E };
 
-// LoRaWAN NwkSKey, network session key
-static const PROGMEM u1_t NWKSKEY[16] = { /*em formato de vetores em hexa */};
-
-// LoRaWAN AppSKey, application session key
-static const u1_t PROGMEM APPSKEY[16] = { /*em formato de vetores em hexa */ };
-static const u4_t DEVADDR = 0x00000; /*preencher com o endereço do device em Hexa */
+// LoRaWAN AppSKey, application session key msb format
+static const u1_t PROGMEM APPSKEY[16] = { 0xB7, 0x00, 0x2C, 0x6C, 0x18, 0xBF, 0xF5, 0x69, 0x81, 0x79, 0xE2, 0x55, 0xEE, 0x66, 0xDA, 0x44 };
+static const u4_t DEVADDR = 0x26031430; 
 
 TTN_esp32 ttn ;
 TTN_CayenneLPP lpp;
@@ -50,17 +44,30 @@ void message(const uint8_t* payload, size_t size, int rssi)
     Serial.println();
 }
 
+void OLEDDisplay() {
+   Heltec.display->clear();
+   Heltec.display->setTextAlignment(TEXT_ALIGN_LEFT);
+   Heltec.display->drawString(0,0, "LORAWAN_STS - SHC");
+   Heltec.display->drawString(0,10, "Frequencia: 916.8MHz");
+   Heltec.display->drawString(0,20, "by PU2SDM e Ferauche");
+   char devAddr[16];
+   sprintf(devAddr, "%08X", DEVADDR);
+    
+   Heltec.display->drawString(0,30, devAddr);
+   Heltec.display->drawString(0,40, "Iniciado!");
+}
+
 void setup()
 {
     Serial.begin(115200);
     Serial.println("Starting");
 
     //Heltec sendo utilizada somente para o display, o controle do Lora é feito pelo objeto ttn
-    Heltec.begin(true /*displayEnable*/, false /*Lora Disable*/, true /*Serial Enable*/);
+    Heltec.begin(true /*displayEnable*/, false/*Lora Enable*/, false /*Serial Enable*/);
     
     ttn.begin();
     ttn.onMessage(message); // declare callback function when is downlink from server
-    ttn.personalize(devAddr, nwkSKey, appSKey);
+    ttn.personalize("0", "0", "0"); //as chaves são iniciadas com 0, pois sao substituídas no código das linhas seguintes para serem copiadas na memória do ESP
 
     uint8_t appskey[sizeof(APPSKEY)];
     uint8_t nwkskey[sizeof(NWKSKEY)];
@@ -84,15 +91,16 @@ void setup()
     // Set data rate and transmit power for uplink
     LMIC_setDrTxpow(DR_SF7,14);
     
-    Heltec.display->clear();
-    Heltec.display->setTextAlignment(TEXT_ALIGN_CENTER);
-    Heltec.display->drawString(0,0, "Iniciando...");
-    Heltec.display->drawString(0,10, String(ttn.getFrequency()));
+    //Heltec.display->init();
+  
+    Heltec.display->display();
     ttn.showStatus();
 }
 
+char txt[20];
+
 void loop()
-{
+{      
     static float nb = 18.2;
     nb += 0.1;
     lpp.reset();
@@ -101,6 +109,10 @@ void loop()
     {
         Serial.printf("Temp: %f TTN_CayenneLPP: %d %x %02X%02X\n", nb, lpp.getBuffer()[0], lpp.getBuffer()[1],
             lpp.getBuffer()[2], lpp.getBuffer()[3]);
+        sprintf(txt, "Enviando %.2f", nb);
+        OLEDDisplay();
+        Heltec.display->drawString(0,50, txt);
+        Heltec.display->display();
     }
     delay(10000);
 }
